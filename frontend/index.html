@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FanPulse AI — Smart Stadium Assistant</title>
+<style>
+  :root {
+    --brand: #0b3d91;
+    --brand-light: #e8f0fe;
+    --ok: #1a7f37;
+    --warn: #b98900;
+    --danger: #c62828;
+    --text: #1a1a1a;
+    --bg: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    margin: 0; color: var(--text); background: var(--bg);
+    line-height: 1.5;
+  }
+  header {
+    background: var(--brand); color: #fff; padding: 1rem 1.25rem;
+  }
+  header h1 { margin: 0; font-size: 1.25rem; }
+  header p { margin: 0.25rem 0 0; font-size: 0.9rem; opacity: 0.9; }
+  main { max-width: 720px; margin: 0 auto; padding: 1.25rem; }
+  section { margin-bottom: 2rem; }
+  h2 { font-size: 1.05rem; border-bottom: 2px solid var(--brand-light); padding-bottom: 0.4rem; }
+  label { display: block; font-weight: 600; margin-bottom: 0.3rem; font-size: 0.9rem; }
+  select, textarea, input[type=text] {
+    width: 100%; padding: 0.6rem; font-size: 1rem; border: 1px solid #ccc;
+    border-radius: 6px; margin-bottom: 0.75rem;
+  }
+  button {
+    background: var(--brand); color: #fff; border: none; padding: 0.65rem 1.1rem;
+    border-radius: 6px; font-size: 1rem; cursor: pointer;
+  }
+  button:hover { opacity: 0.9; }
+  button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-visible {
+    outline: 3px solid #ffbf47; outline-offset: 2px;
+  }
+  .toggle { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+  .reply-box {
+    background: var(--brand-light); border-radius: 8px; padding: 0.9rem;
+    margin-top: 0.75rem; min-height: 2.5rem; white-space: pre-wrap;
+  }
+  .zone-card {
+    border: 1px solid #ddd; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 0.6rem;
+  }
+  .badge {
+    display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px;
+    font-size: 0.8rem; font-weight: 700; color: #fff;
+  }
+  .badge.low { background: var(--ok); }
+  .badge.moderate { background: #2f7d32; }
+  .badge.high { background: var(--warn); }
+  .badge.critical { background: var(--danger); }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+  footer { text-align: center; font-size: 0.8rem; color: #666; padding: 1.5rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚽ FanPulse AI</h1>
+  <p>Smart stadium assistant · FIFA World Cup 2026</p>
+</header>
+
+<main>
+  <section aria-labelledby="chat-heading">
+    <h2 id="chat-heading">Ask FanPulse</h2>
+
+    <label for="lang-select">Language</label>
+    <select id="lang-select" aria-describedby="lang-help"></select>
+    <p id="lang-help" class="sr-only">Choose the language for the assistant's reply</p>
+
+    <div class="toggle">
+      <input type="checkbox" id="accessibility-toggle" />
+      <label for="accessibility-toggle" style="margin:0;">Accessibility mode (simpler language, short sentences)</label>
+    </div>
+
+    <label for="chat-input">Your question</label>
+    <textarea id="chat-input" rows="3" placeholder="e.g. Where can I refill water near Gate C?"
+      aria-required="true"></textarea>
+
+    <button id="chat-send" type="button">Ask</button>
+
+    <div id="chat-reply" class="reply-box" role="status" aria-live="polite"></div>
+  </section>
+
+  <section aria-labelledby="crowd-heading">
+    <h2 id="crowd-heading">Live Gate Crowd Status</h2>
+    <button id="refresh-crowd" type="button">Refresh</button>
+    <div id="crowd-list" style="margin-top: 0.75rem;" aria-live="polite"></div>
+  </section>
+</main>
+
+<footer>Demo build for hackathon evaluation. Not affiliated with FIFA.</footer>
+
+<script src="config.js"></script>
+<script>
+  const API_BASE = window.FANPULSE_API_BASE || "http://localhost:8000";
+
+  const LANGS = { en: "English", es: "Spanish", pt: "Portuguese", fr: "French",
+                  hi: "Hindi", ar: "Arabic", de: "German", ja: "Japanese" };
+  const langSelect = document.getElementById("lang-select");
+  Object.entries(LANGS).forEach(([code, name]) => {
+    const opt = document.createElement("option");
+    opt.value = code; opt.textContent = name;
+    langSelect.appendChild(opt);
+  });
+
+  async function sendChat() {
+    const message = document.getElementById("chat-input").value.trim();
+    const replyBox = document.getElementById("chat-reply");
+    if (!message) {
+      replyBox.textContent = "Please type a question first.";
+      return;
+    }
+    replyBox.textContent = "Thinking…";
+    try {
+      const res = await fetch(`${API_BASE}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message,
+          language: langSelect.value,
+          accessibility_mode: document.getElementById("accessibility-toggle").checked,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        replyBox.textContent = data.detail || "Something went wrong. Please try again.";
+        return;
+      }
+      replyBox.textContent = data.reply;
+    } catch (err) {
+      replyBox.textContent = "Network error — could not reach FanPulse.";
+    }
+  }
+
+  document.getElementById("chat-send").addEventListener("click", sendChat);
+  document.getElementById("chat-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); }
+  });
+
+  async function loadCrowd() {
+    const list = document.getElementById("crowd-list");
+    list.textContent = "Loading…";
+    try {
+      const res = await fetch(`${API_BASE}/crowd-status`);
+      const zones = await res.json();
+      list.innerHTML = "";
+      zones.forEach((z) => {
+        const card = document.createElement("div");
+        card.className = "zone-card";
+        card.innerHTML = `
+          <strong>${z.name}</strong>
+          <span class="badge ${z.status}">${z.status.toUpperCase()}</span>
+          <div>${z.occupancy_pct}% full</div>
+          <div>${z.recommendation}</div>
+        `;
+        list.appendChild(card);
+      });
+    } catch (err) {
+      list.textContent = "Could not load crowd status.";
+    }
+  }
+
+  document.getElementById("refresh-crowd").addEventListener("click", loadCrowd);
+  loadCrowd();
+</script>
+</body>
+</html>
