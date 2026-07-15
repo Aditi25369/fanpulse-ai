@@ -10,7 +10,7 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
-        value: gemini-2.0-flash
+        value: gemini-3.1-flash-lite
       - key: ALLOWED_ORIGINS
         value: https://fanpulse-ai.vercel.app
     healthCheckPath: /health
